@@ -1,0 +1,13 @@
+#!name=北外滩国客中心每日随机签到
+#!desc=远程加载脚本，自动保存Token；每天北京时间11:00–12:00随机签到一次；登录过期通知更新。
+
+# 启用前请停用原来的同名模块、独立签到任务和Token提取任务，避免重复运行。
+# 需开启HTTPS解密，并安装、信任Shadowrocket当前使用的证书。
+# Token和签到状态只保存在手机本地，不包含在仓库中。
+
+[Script]
+国客Token提取 = type=http-request,pattern=^https://m\.mallcoo\.cn/api/,script-path=https://raw.githubusercontent.com/lh0410/shadowrocket-config/main/scripts/beiwaitan-token.js,requires-body=true,binary-body-mode=false,max-size=131072,engine=jsc,timeout=10,enable=true
+国客每日签到 = type=cron,cronexp="*/5 11 * * *",script-path=https://raw.githubusercontent.com/lh0410/shadowrocket-config/main/scripts/beiwaitan-signin.js,engine=jsc,timeout=60,enable=true
+
+[MITM]
+hostname = %APPEND% m.mallcoo.cn

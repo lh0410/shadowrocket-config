@@ -1,0 +1,11 @@
+.private/
+__pycache__/
+node_modules/
+.env
+.env.*
+*.captureenv
+*.pem
+*.key
+*.p12
+*.pfx
+requests.jsonl
