@@ -1,9 +1,12 @@
-#!name=北外滩国客中心每日随机签到
-#!desc=远程加载脚本，自动保存Token；每天北京时间11:00–12:00随机签到一次；登录过期通知更新。
+#!name=walter个人配置
+#!desc=个人直连规则；北外滩国客中心Token自动提取、每日11:00–12:00随机签到及过期提醒。
 
 # 启用前请停用原来的同名模块、独立签到任务和Token提取任务，避免重复运行。
 # 需开启HTTPS解密，并安装、信任Shadowrocket当前使用的证书。
 # Token和签到状态只保存在手机本地，不包含在仓库中。
+
+[Rule]
+DOMAIN,emby.barrybarry.top,DIRECT
 
 [Script]
 国客Token提取 = type=http-request,pattern=^https://m\.mallcoo\.cn/api/,script-path=https://raw.githubusercontent.com/lh0410/shadowrocket-config/main/scripts/beiwaitan-token.js,requires-body=true,binary-body-mode=false,max-size=131072,engine=jsc,timeout=10,enable=true
