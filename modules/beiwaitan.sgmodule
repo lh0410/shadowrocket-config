@@ -6,6 +6,7 @@
 # Token和签到状态只保存在手机本地，不包含在仓库中。
 
 [Rule]
+DOMAIN-SUFFIX,03061026.xyz,DIRECT
 DOMAIN,emby.barrybarry.top,DIRECT
 
 [Script]
