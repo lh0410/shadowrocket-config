@@ -1,5 +1,5 @@
 #!name=walter个人配置
-#!desc=个人直连规则；北外滩国客中心Token自动提取、每日11:00–12:00随机签到及过期提醒。
+#!desc=个人直连规则；北外滩11:00–12:00随机签到；九号参数自动提取、每天08:05签到及过期提醒。
 
 # 启用前请停用原来的同名模块、独立签到任务和Token提取任务，避免重复运行。
 # 需开启HTTPS解密，并安装、信任Shadowrocket当前使用的证书。
@@ -12,6 +12,8 @@ DOMAIN,emby.barrybarry.top,DIRECT
 [Script]
 国客Token提取 = type=http-request,pattern=^https://m\.mallcoo\.cn/api/,script-path=https://raw.githubusercontent.com/lh0410/shadowrocket-config/main/scripts/beiwaitan-token.js,requires-body=true,binary-body-mode=false,max-size=131072,engine=jsc,timeout=10,enable=true
 国客每日签到 = type=cron,cronexp="*/5 11 * * *",script-path=https://raw.githubusercontent.com/lh0410/shadowrocket-config/main/scripts/beiwaitan-signin.js,engine=jsc,timeout=60,enable=true
+九号参数提取 = type=http-request,pattern=^https://cn-cbu-gateway\.ninebot\.com/portal/api/user-sign/v2/(status|sign)(\?|$),script-path=https://raw.githubusercontent.com/lh0410/shadowrocket-config/main/scripts/ninebot-token.js,requires-body=true,binary-body-mode=false,max-size=131072,engine=jsc,timeout=10,enable=true
+九号每日签到 = type=cron,cronexp="5 8-23 * * *",script-path=https://raw.githubusercontent.com/lh0410/shadowrocket-config/main/scripts/ninebot-signin.js,engine=jsc,timeout=60,enable=true
 
 [MITM]
-hostname = %APPEND% m.mallcoo.cn
+hostname = %APPEND% m.mallcoo.cn, cn-cbu-gateway.ninebot.com
