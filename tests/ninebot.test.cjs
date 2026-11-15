@@ -17,6 +17,8 @@ function run(options = {}) {
     constructor(...args) { super(...(args.length ? args : [instant])); }
     static now() { return instant; }
   }
+  const math = Object.create(Math);
+  math.random = () => options.random ?? 0;
   function http(method, request, callback) {
     const endpoint = new URL(request.url).pathname.split('/').pop();
     calls.push({ method, endpoint, request });
@@ -35,7 +37,7 @@ function run(options = {}) {
     if (options.defer) queueMicrotask(reply); else reply();
   }
   const context = {
-    Date: Clock, console: { log: value => logs.push(String(value)) },
+    Date: Clock, Math: math, console: { log: value => logs.push(String(value)) },
     $persistentStore: {
       read: key => store[key] ?? null,
       write: (value, key) => {
@@ -139,9 +141,52 @@ test('missing credentials never issue HTTP requests and notification is deduplic
   assert.equal(run({ store: result.store }).notices.length, 0);
 });
 
-test('before 11:00 only queries and 23:00 can recover a missed morning run', () => {
-  assert.deepEqual(run({ time: '2026-11-14T23:00:00Z' }).calls.map(c => c.endpoint), ['status']);
-  assert.equal(JSON.parse(run({ time: '2026-11-15T15:00:00Z' }).store[STATE]).status, 'signed_in');
+test('outside 11 to 12 only queries and never submits', () => {
+  for (const time of ['2026-11-15T02:59:59Z', '2026-11-15T04:00:00Z', '2026-11-15T15:00:00Z']) {
+    const result = run({ time });
+    assert.deepEqual(result.calls.map(c => c.endpoint), ['status']);
+    assert.equal(JSON.parse(result.store[STATE]).status, 'pending');
+  }
+});
+
+test('daily random minute remains fixed and executes once when due', () => {
+  const first = run({ time: '2026-11-15T03:10:00Z', random: 0.9 });
+  assert.equal(JSON.parse(first.store[STATE]).minute, 54);
+  assert.equal(first.calls.length, 0);
+  const waiting = run({ store: first.store, time: '2026-11-15T03:53:00Z', random: 0 });
+  assert.equal(JSON.parse(waiting.store[STATE]).minute, 54);
+  assert.equal(waiting.calls.length, 0);
+  const due = run({ store: first.store, time: '2026-11-15T03:54:00Z', random: 0 });
+  assert.equal(due.calls.length, 3);
+  assert.equal(run({ store: due.store, time: '2026-11-15T03:55:00Z' }).calls.length, 0);
+  const next = run({ store: due.store, time: '2026-11-16T03:00:00Z', random: 0.5 });
+  assert.equal(JSON.parse(next.store[STATE]).minute, 30);
+  assert.equal(next.calls.length, 0);
+});
+
+test('credential refresh preserves the same-day random plan', () => {
+  const first = run({ random: 0.9 });
+  run({ capture: true, request: req({ Authorization: 'Bearer refreshed-auth', device_id: deviceId }), store: first.store });
+  const result = run({ store: first.store, random: 0 });
+  assert.equal(JSON.parse(result.store[STATE]).minute, 54);
+  assert.equal(result.calls.length, 0);
+});
+
+test('last random minute is available and crossing noon during precheck prevents submission', () => {
+  const first = run({ random: 0.999 });
+  assert.equal(JSON.parse(first.store[STATE]).minute, 59);
+  assert.equal(first.calls.length, 0);
+  assert.equal(run({ store: first.store, time: '2026-11-15T03:59:00Z' }).calls.length, 3);
+  const crossing = run({ time: '2026-11-15T03:59:59Z', answer: () => ({ advanceTo: '2026-11-15T04:00:00Z' }) });
+  assert.equal(crossing.calls.length, 1);
+});
+
+test('migrates old pending state while retaining completed and uncertain outcomes', () => {
+  for (const status of ['pending', 'signed_in', 'uncertain']) {
+    const store = { ...initial(), [STATE]: JSON.stringify({ day: '2026-11-15', revision: 'v1', deviceId, status }) };
+    const result = run({ store });
+    assert.equal(result.calls.length, status === 'pending' ? 3 : status === 'uncertain' ? 1 : 0);
+  }
 });
 
 test('next Beijing date allows a new check-in', () => {
@@ -238,7 +283,7 @@ test('module keeps existing rules and BWT schedule while enabling both Ninebot s
   assert(module.includes('DOMAIN-SUFFIX,03061026.xyz,DIRECT'));
   assert(module.includes('DOMAIN,emby.barrybarry.top,DIRECT'));
   assert(module.includes('cronexp="*/5 11 * * *"'));
-  assert(module.includes('cronexp="0 11-23 * * *"'));
+  assert(module.includes('cronexp="* 11 * * *"'));
   const pattern = module.split('\n').find(line => line.startsWith('九号参数提取')).match(/pattern=(.*?),script-path=/)[1];
   assert(new RegExp(pattern).test(req().url));
   assert(new RegExp(pattern).test(req().url.replace('status?t=1', 'sign')));

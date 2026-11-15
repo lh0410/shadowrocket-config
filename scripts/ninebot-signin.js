@@ -1,5 +1,5 @@
 // 九号出行 Shadowrocket cron；API 参考 https://github.com/waistu/Ninebot 。
-// 每天 11:00 开始，每小时检查至 23:00，按北京时间去重。
+// 每天北京时间 11:00–11:59 随机选择一分钟，窗口外只查询、不补签。
 (function () {
   var ACCOUNT = "ninebot_account_v1";
   var STATE = "ninebot_signin_state_v1";
@@ -13,7 +13,7 @@
   function clock() {
     var date = new Date(Date.now() + 8 * 3600000);
     function pad(n) { return n < 10 ? "0" + n : String(n); }
-    return { day: date.getUTCFullYear() + "-" + pad(date.getUTCMonth() + 1) + "-" + pad(date.getUTCDate()), hour: date.getUTCHours() };
+    return { day: date.getUTCFullYear() + "-" + pad(date.getUTCMonth() + 1) + "-" + pad(date.getUTCDate()), hour: date.getUTCHours(), minute: date.getUTCMinutes() };
   }
   function save() {
     if (!$persistentStore.write(JSON.stringify(state), STATE)) { throw new Error("本地状态保存失败。"); }
@@ -123,16 +123,31 @@
     }
     if (state.expiredRevision === account.revision) { log("等待新的登录参数，未继续请求。"); finish(); return; }
     if (state.day !== today || state.revision !== account.revision) {
+      var plannedMinute = state.day === today ? state.minute : null;
       var unresolved = state.day === today && state.deviceId === account.deviceId &&
         (state.status === "submitting" || state.status === "uncertain");
       state = { day: today, revision: account.revision, deviceId: account.deviceId, status: unresolved ? "uncertain" : "pending" };
+      if (typeof plannedMinute === "number" && plannedMinute >= 0 && plannedMinute < 60 && plannedMinute % 1 === 0) {
+        state.minute = plannedMinute;
+      }
       save();
     }
     if (state.status === "signed_in") { log("今日已完成，不重复请求。"); finish(); return; }
+    var now = clock();
+    if (now.day === today && now.hour === 11) {
+      if (typeof state.minute !== "number" || state.minute < 0 || state.minute >= 60 || state.minute % 1 !== 0) {
+        state.minute = Math.floor(Math.random() * 60); save();
+      }
+      if (now.minute < state.minute) {
+        log("今日计划 11:" + (state.minute < 10 ? "0" : "") + state.minute + " 签到，暂未到时间。");
+        finish(); return;
+      }
+    }
     request("get", "status", function (data) {
       if (signed(data)) { markDone(data, "今日已签到"); return; }
-      if (clock().day !== today || clock().hour < 11) {
-        notify(today + ":ready", "状态检查通过", "参数有效，今日尚未签到；每天北京时间 11:00 开始执行。"); finish(); return;
+      var submitTime = clock();
+      if (submitTime.day !== today || submitTime.hour !== 11 || now.hour !== 11) {
+        notify(today + ":ready", "状态检查通过", "参数有效，今日尚未签到；每天北京时间 11:00–12:00 内随机执行，窗口外只查询、不补签。"); finish(); return;
       }
       if (state.status === "submitting" || state.status === "uncertain") {
         throw problem("uncertain", "上次提交结果尚未确认，请在九号 App 核对，本日后续只查询状态。");
