@@ -1,5 +1,5 @@
 // 九号出行 Shadowrocket cron；API 参考 https://github.com/waistu/Ninebot 。
-// 每天 08:05 开始，每小时检查至 23:05，按北京时间去重。
+// 每天 11:00 开始，每小时检查至 23:00，按北京时间去重。
 (function () {
   var ACCOUNT = "ninebot_account_v1";
   var STATE = "ninebot_signin_state_v1";
@@ -131,8 +131,8 @@
     if (state.status === "signed_in") { log("今日已完成，不重复请求。"); finish(); return; }
     request("get", "status", function (data) {
       if (signed(data)) { markDone(data, "今日已签到"); return; }
-      if (clock().day !== today || clock().hour < 8) {
-        notify(today + ":ready", "状态检查通过", "参数有效，今日尚未签到；每天北京时间 08:05 开始执行。"); finish(); return;
+      if (clock().day !== today || clock().hour < 11) {
+        notify(today + ":ready", "状态检查通过", "参数有效，今日尚未签到；每天北京时间 11:00 开始执行。"); finish(); return;
       }
       if (state.status === "submitting" || state.status === "uncertain") {
         throw problem("uncertain", "上次提交结果尚未确认，请在九号 App 核对，本日后续只查询状态。");

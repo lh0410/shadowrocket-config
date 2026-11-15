@@ -12,7 +12,7 @@ const initial = () => ({ [ACCOUNT]: JSON.stringify({ authorization: auth, device
 function run(options = {}) {
   const store = options.store || initial();
   const calls = [], notices = [], logs = [];
-  let done = 0, instant = Date.parse(options.time || '2026-11-15T00:05:00Z');
+  let done = 0, instant = Date.parse(options.time || '2026-11-15T03:00:00Z');
   class Clock extends Date {
     constructor(...args) { super(...(args.length ? args : [instant])); }
     static now() { return instant; }
@@ -139,14 +139,14 @@ test('missing credentials never issue HTTP requests and notification is deduplic
   assert.equal(run({ store: result.store }).notices.length, 0);
 });
 
-test('before 08:00 only queries and 23:05 can recover a missed morning run', () => {
-  assert.deepEqual(run({ time: '2026-11-14T23:05:00Z' }).calls.map(c => c.endpoint), ['status']);
-  assert.equal(JSON.parse(run({ time: '2026-11-15T15:05:00Z' }).store[STATE]).status, 'signed_in');
+test('before 11:00 only queries and 23:00 can recover a missed morning run', () => {
+  assert.deepEqual(run({ time: '2026-11-14T23:00:00Z' }).calls.map(c => c.endpoint), ['status']);
+  assert.equal(JSON.parse(run({ time: '2026-11-15T15:00:00Z' }).store[STATE]).status, 'signed_in');
 });
 
 test('next Beijing date allows a new check-in', () => {
   const result = run();
-  assert.equal(run({ store: result.store, time: '2026-11-16T00:05:00Z' }).calls.length, 3);
+  assert.equal(run({ store: result.store, time: '2026-11-16T03:00:00Z' }).calls.length, 3);
 });
 
 test('status request network failure remains retryable', () => {
@@ -209,7 +209,7 @@ test('malformed state is retained; active lock and failed state saves prevent su
   const store = { ...initial(), [STATE]: '{broken' };
   assert.equal(run({ store }).calls.length, 0);
   assert.equal(store[STATE], '{broken');
-  const locked = { ...initial(), [LOCK]: JSON.stringify({ owner: 'other', expires: Date.parse('2026-11-15T00:06:00Z') }) };
+  const locked = { ...initial(), [LOCK]: JSON.stringify({ owner: 'other', expires: Date.parse('2026-11-15T03:01:00Z') }) };
   assert.equal(run({ store: locked }).calls.length, 0);
   assert(locked[LOCK]);
   assert.equal(run({ failWrite: STATE }).calls.length, 0);
@@ -238,7 +238,7 @@ test('module keeps existing rules and BWT schedule while enabling both Ninebot s
   assert(module.includes('DOMAIN-SUFFIX,03061026.xyz,DIRECT'));
   assert(module.includes('DOMAIN,emby.barrybarry.top,DIRECT'));
   assert(module.includes('cronexp="*/5 11 * * *"'));
-  assert(module.includes('cronexp="5 8-23 * * *"'));
+  assert(module.includes('cronexp="0 11-23 * * *"'));
   const pattern = module.split('\n').find(line => line.startsWith('九号参数提取')).match(/pattern=(.*?),script-path=/)[1];
   assert(new RegExp(pattern).test(req().url));
   assert(new RegExp(pattern).test(req().url.replace('status?t=1', 'sign')));

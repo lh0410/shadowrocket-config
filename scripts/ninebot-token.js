@@ -48,7 +48,7 @@
     if (!$persistentStore.write(JSON.stringify(account), KEY)) {
       notify("参数保存失败", "请检查 Shadowrocket 本地存储，然后重新打开签到页面。"); return;
     }
-    notify("签到参数已保存", "已获取 Authorization 和设备 ID，每天 08:05 开始自动签到；参数仅保存在本机。");
+    notify("签到参数已保存", "已获取 Authorization 和设备 ID，每天 11:00 开始自动签到；参数仅保存在本机。");
   } catch (error) {
     notify("参数提取失败", "请检查脚本、本地存储及 HTTPS 解密配置，然后重新打开九号签到页面。");
   } finally { $done({}); }
