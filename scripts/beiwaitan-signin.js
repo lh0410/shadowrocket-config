@@ -118,6 +118,28 @@
     save();
   }
 
+  function rewardMessage(result) {
+    function text(value) {
+      if (typeof value !== "string" && !(typeof value === "number" && isFinite(value))) { return ""; }
+      return String(value).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+    }
+    var message = text(result.Msg);
+    var content = text(result.Content);
+    if (content && message.indexOf(content) === -1) {
+      var unit = result.RewardType === 1 && /^\d+(\.\d+)?$/.test(content) ? "积分" : "";
+      message += (message ? "\n" : "") + "本次奖励：" + content + unit;
+    }
+    if (!message) { message = "接口已确认今日签到成功，未返回奖励明细。"; }
+    var description = text(result.Desc);
+    if (description && message.indexOf(description) === -1) { message += "\n" + description; }
+    if (result.IsGiveSucess === false) { message += "\n奖励发放尚未确认，请在小程序核对。"; }
+    return message;
+  }
+
+  function savedReward(day) {
+    return state.rewardDay === day && typeof state.rewardMessage === "string" ? state.rewardMessage : "";
+  }
+
   function begin() {
     state = JSON.parse($persistentStore.read(STATE_KEY) || "{}");
     if (!state || typeof state !== "object" || Array.isArray(state)) {
@@ -150,7 +172,7 @@
         save();
       }
       if (state.status === "signed_in" || state.status === "already_signed_in") {
-        log("今日已完成，不重复提交。"); finish(); return;
+        log("今日已完成，不重复提交。" + (savedReward(now.day) ? "\n" + savedReward(now.day) : "")); finish(); return;
       }
       if (now.minute < state.minute) {
         log("今日计划 " + START_HOUR + ":" + (state.minute < 10 ? "0" : "") + state.minute + " 执行，暂未到时间。");
@@ -160,7 +182,10 @@
     post(CHECK, {MallId: 11949, IsCheckMemberCard: true}, function (checked) {
       if (checked.IsCheckIn === true) {
         markDone("already_signed_in");
-        if (!inWindow) { notify(now.day + ":status:done", "状态检查通过", "Token 有效，今日已签到。每天北京时间 " + START_HOUR + "–" + (START_HOUR + 1) + " 点内随机检查执行。"); }
+        if (!inWindow) {
+          var detail = savedReward(now.day) || "本次状态查询未返回奖励明细，请在小程序查看。";
+          notify(now.day + ":status:done", "状态检查通过", "Token 有效，今日已签到。每天北京时间 " + START_HOUR + "–" + (START_HOUR + 1) + " 点内随机检查执行。\n" + detail);
+        }
         else { log("服务端确认今日已签到，跳过提交。"); }
         finish(); return;
       }
@@ -191,9 +216,10 @@
         save();
         post(SIGN, {MallID: 11949, Longitude: 0, Latitude: 0, InMall: 0}, function (result) {
           if (result.IsCheckIn !== true) { throw problem("unconfirmed", "接口未确认签到成功，请在小程序核对。"); }
+          state.rewardMessage = rewardMessage(result);
+          state.rewardDay = now.day;
           markDone("signed_in");
-          var reward = typeof result.Content === "string" && /^\d+(\.\d+)?$/.test(result.Content) ? result.Content : "";
-          notify(now.day + ":success", "签到成功", reward ? "本次奖励：" + reward + "；具体发放以小程序为准。" : "接口已确认今日签到成功。");
+          notify(now.day + ":success", "签到成功", state.rewardMessage);
           finish();
         });
       });
