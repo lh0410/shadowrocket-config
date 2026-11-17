@@ -19,7 +19,6 @@ DOMAIN,csc-service.sgcc.com.cn,DIRECT
 万象参数提取 = type=http-request,pattern=^https://app\.mixcapp\.com/mixc/(gateway|api/v4/member/getPersonalData)(\?|$),script-path=https://raw.githubusercontent.com/lh0410/shadowrocket-config/main/scripts/mall-token.js?v=20261117-malls,requires-body=true,binary-body-mode=false,max-size=131072,engine=jsc,timeout=10,enable=true
 龙湖参数提取 = type=http-request,pattern=^https://gw2c-hw-open\.longfor\.com/lmarketing-task-api-mvc-prod/openapi/task/v1/signature/(page-info|clock)(\?|$),script-path=https://raw.githubusercontent.com/lh0410/shadowrocket-config/main/scripts/mall-token.js?v=20261117-malls,requires-body=true,binary-body-mode=false,max-size=131072,engine=jsc,timeout=10,enable=true
 百联万象龙湖签到 = type=cron,cronexp="* 11 * * *",script-path=https://raw.githubusercontent.com/lh0410/shadowrocket-config/main/scripts/mall-signin.js?v=20261117-malls,engine=jsc,timeout=60,enable=true
-网上国网每日签到 = type=cron,cronexp="* 11 * * *",script-path=https://raw.githubusercontent.com/lh0410/shadowrocket-config/main/scripts/sgcc-signin.js?v=20261117-sgcc,engine=jsc,timeout=60,enable=true
 
 [MITM]
 hostname = %APPEND% m.mallcoo.cn, cn-cbu-gateway.ninebot.com, mh5.bl.com, app.mixcapp.com, gw2c-hw-open.longfor.com
