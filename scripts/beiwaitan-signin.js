@@ -2,12 +2,14 @@
 // Cron：*/5 11 * * *；引擎 jsc；脚本超时 60 秒。
 // 使用提取脚本保存的 beiwaitan_token；时间按北京时间判断。
 // 11:00–11:55 随机选择一个 5 分钟时点；窗口外运行只查询，不补签。
+// 连续签到满 7 天后停签一天；结合服务端连续天数和本机停签日期恢复周期。
 (function () {
   var START_HOUR = 11;
   var STATE_KEY = "beiwaitan_signin_state_v1";
   var LOCK_KEY = "beiwaitan_signin_lock_v1";
   var BASE = "https://m.mallcoo.cn";
   var CHECK = "/api/user/user/CheckinBefore";
+  var DETAIL = "/api/user/User/GetCheckinDetail";
   var RULE = "/api/user/Checkin/GetCheckinRuleBasicInfo";
   var SIGN = "/api/user/User/CheckinV2";
   var state = {};
@@ -87,7 +89,7 @@
     $httpClient.post({
       url: BASE + path,
       headers: {"Content-Type": "application/json", "Accept": "application/json"},
-      body: JSON.stringify(fields), timeout: 15
+      body: JSON.stringify(fields), timeout: 12
     }, function (error, response, body) {
       if (finished) { return; }
       try {
@@ -112,10 +114,53 @@
     });
   }
 
-  function markDone(status) {
-    state.day = clock().day;
+  function dayAfter(day, amount) {
+    return new Date(Date.parse(day + "T00:00:00Z") + amount * 86400000).toISOString().slice(0, 10);
+  }
+
+  function validDay(day) {
+    return typeof day === "string" && /^\d{4}-\d{2}-\d{2}$/.test(day) && dayAfter(day, 0) === day;
+  }
+
+  function countDays(value) {
+    if (typeof value !== "number" && !(typeof value === "string" && /^\d+$/.test(value))) {
+      throw problem("cycle", "无法读取连续签到天数，本次未提交，请在小程序核对。");
+    }
+    var count = Number(value);
+    if (!isFinite(count) || count < 0 || Math.floor(count) !== count) {
+      throw problem("cycle", "连续签到天数异常，本次未提交，请在小程序核对。");
+    }
+    return count;
+  }
+
+  function markDone(status, day, count) {
+    state.day = day;
     state.status = status;
+    state.cycleDay = day;
+    state.cycleCount = count;
+    if (count >= 7) { state.restDay = dayAfter(day, 1); }
+    else { delete state.restDay; }
     save();
+  }
+
+  function rest(day) {
+    state.day = day;
+    state.status = "rest";
+    state.restDay = day;
+    save();
+    notify(day + ":rest", "今日停签一天", "连续签到已满7天，今天不提交签到，明天北京时间11–12点恢复。停签日请勿在小程序或其他设备签到。");
+    finish();
+  }
+
+  function afterBreak(day) {
+    return (validDay(state.cycleDay) && dayAfter(state.cycleDay, 1) < day) ||
+      (validDay(state.restDay) && state.restDay < day && (!validDay(state.cycleDay) || state.cycleDay < state.restDay));
+  }
+
+  function cycleCount(serverCount, day, signedToday) {
+    if (afterBreak(day)) { return signedToday ? 1 : 0; }
+    if (state.cycleDay === dayAfter(day, -1)) { return state.cycleCount + (signedToday ? 1 : 0); }
+    return serverCount;
   }
 
   function rewardMessage(result) {
@@ -164,6 +209,16 @@
     if (state.expiredToken) { delete state.expiredToken; save(); }
     var now = clock();
     var inWindow = now.hour === START_HOUR;
+    if (((state.cycleDay == null) !== (state.cycleCount == null)) ||
+        (state.cycleDay != null && (!validDay(state.cycleDay) || state.cycleDay > now.day)) ||
+        (state.cycleCount != null && countDays(state.cycleCount) !== state.cycleCount) ||
+        (state.restDay != null && !validDay(state.restDay))) {
+      throw problem("cycle", "本地签到周期记录异常，本次未提交，请检查存储。");
+    }
+    if (state.restDay === now.day ||
+        (state.cycleCount >= 7 && validDay(state.cycleDay) && dayAfter(state.cycleDay, 1) === now.day)) {
+      rest(now.day); return;
+    }
     if (inWindow) {
       if (state.day !== now.day) {
         state.day = now.day;
@@ -171,7 +226,7 @@
         state.status = "pending";
         save();
       }
-      if (state.status === "signed_in" || state.status === "already_signed_in") {
+      if ((state.status === "signed_in" || state.status === "already_signed_in") && state.cycleDay === now.day) {
         log("今日已完成，不重复提交。" + (savedReward(now.day) ? "\n" + savedReward(now.day) : "")); finish(); return;
       }
       if (now.minute < state.minute) {
@@ -181,13 +236,19 @@
     }
     post(CHECK, {MallId: 11949, IsCheckMemberCard: true}, function (checked) {
       if (checked.IsCheckIn === true) {
-        markDone("already_signed_in");
-        if (!inWindow) {
-          var detail = savedReward(now.day) || "本次状态查询未返回奖励明细，请在小程序查看。";
-          notify(now.day + ":status:done", "状态检查通过", "Token 有效，今日已签到。每天北京时间 " + START_HOUR + "–" + (START_HOUR + 1) + " 点内随机检查执行。\n" + detail);
-        }
-        else { log("服务端确认今日已签到，跳过提交。"); }
-        finish(); return;
+        var already = function (count) {
+          if (count < 1) { throw problem("cycle", "今日已签到，但连续天数不一致，请在小程序核对。"); }
+          markDone("already_signed_in", now.day, count);
+          if (!inWindow) {
+            var detail = savedReward(now.day) || "本次状态查询未返回奖励明细，请在小程序查看。";
+            notify(now.day + ":status:done", "状态检查通过", "Token 有效，今日已签到。每天北京时间 " + START_HOUR + "–" + (START_HOUR + 1) + " 点内随机检查执行。\n" + detail + (count >= 7 ? "\n连续签到已满7天，明天停签一天。" : ""));
+          }
+          else { log("服务端确认今日已签到，跳过提交。" + (count >= 7 ? "明天停签一天。" : "")); }
+          finish();
+        };
+        if (state.cycleDay === now.day && typeof state.cycleCount === "number") { already(state.cycleCount); }
+        else { post(DETAIL, {MallID: 11949}, function (detail) { already(cycleCount(countDays(detail.ContinueDay), now.day, true)); }); }
+        return;
       }
       if (checked.IsCheckIn !== false) { throw problem("response", "无法确认今日签到状态，未提交。"); }
       if (!inWindow) {
@@ -198,29 +259,34 @@
         throw problem("uncertain", "上次提交结果未确认，请检查小程序；本脚本不会再次自动提交。");
       }
       if (checked.IsOpenCheckin !== true) { throw problem("closed", "当前未开放签到。"); }
-      post(RULE, {MallID: 11949}, function (rules) {
-        if (rules.IsOpenCheckinForPosition !== false) {
-          throw problem("manual", "位置签到要求已变化或无法确认，请到小程序手动签到。");
-        }
-        var restricted = ["IsOpenCheckinForPosition", "IsOpenCheckinForWecom", "IsOpenCheckinForGroup"];
-        for (var i = 0; i < restricted.length; i++) {
-          if (rules[restricted[i]] || checked[restricted[i]]) {
-            throw problem("manual", "签到增加了位置、企微或集团条件，请到小程序确认。");
+      post(DETAIL, {MallID: 11949}, function (detail) {
+        var serverCount = countDays(detail.ContinueDay);
+        var previousCount = cycleCount(serverCount, now.day, false);
+        if (previousCount >= 7) { rest(now.day); return; }
+        post(RULE, {MallID: 11949}, function (rules) {
+          if (rules.IsOpenCheckinForPosition !== false) {
+            throw problem("manual", "位置签到要求已变化或无法确认，请到小程序手动签到。");
           }
-        }
-        var submitTime = clock();
-        if (submitTime.day !== now.day || submitTime.hour !== START_HOUR) {
-          log("已超出执行时段，未提交签到。"); finish(); return;
-        }
-        state.status = "submitting";
-        save();
-        post(SIGN, {MallID: 11949, Longitude: 0, Latitude: 0, InMall: 0}, function (result) {
-          if (result.IsCheckIn !== true) { throw problem("unconfirmed", "接口未确认签到成功，请在小程序核对。"); }
-          state.rewardMessage = rewardMessage(result);
-          state.rewardDay = now.day;
-          markDone("signed_in");
-          notify(now.day + ":success", "签到成功", state.rewardMessage);
-          finish();
+          var restricted = ["IsOpenCheckinForPosition", "IsOpenCheckinForWecom", "IsOpenCheckinForGroup"];
+          for (var i = 0; i < restricted.length; i++) {
+            if (rules[restricted[i]] || checked[restricted[i]]) {
+              throw problem("manual", "签到增加了位置、企微或集团条件，请到小程序确认。");
+            }
+          }
+          var submitTime = clock();
+          if (submitTime.day !== now.day || submitTime.hour !== START_HOUR) {
+            log("已超出执行时段，未提交签到。"); finish(); return;
+          }
+          state.status = "submitting";
+          save();
+          post(SIGN, {MallID: 11949, Longitude: 0, Latitude: 0, InMall: 0}, function (result) {
+            if (result.IsCheckIn !== true) { throw problem("unconfirmed", "接口未确认签到成功，请在小程序核对。"); }
+            state.rewardMessage = rewardMessage(result);
+            state.rewardDay = now.day;
+            markDone("signed_in", now.day, previousCount + 1);
+            notify(now.day + ":success", "签到成功", state.rewardMessage + (state.cycleCount >= 7 ? "\n连续签到已满7天，明天停签一天。" : ""));
+            finish();
+          });
         });
       });
     });
