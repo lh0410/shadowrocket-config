@@ -1,0 +1,20 @@
+{
+  "id": "lh0410.walter",
+  "name": "walter个人配置",
+  "author": "lh0410",
+  "repo": "https://github.com/lh0410/shadowrocket-config",
+  "apps": [
+    {
+      "id": "walter.sgcc",
+      "name": "网上国网",
+      "keys": ["sgcc_phone", "sgcc_password", "sgcc_sms", "sgcc_reset_login"],
+      "settings": [
+        { "id": "sgcc_phone", "name": "手机号", "val": "", "type": "text", "desc": "仅保存在当前手机，用于网上国网登录。" },
+        { "id": "sgcc_password", "name": "登录密码", "val": "", "type": "text", "desc": "未设置过密码请先在网上国网App设置；不要分享含密码的BoxJS备份。" },
+        { "id": "sgcc_sms", "name": "短信验证码", "val": "", "type": "text", "desc": "首次需要时填写6位验证码，再手动运行签到任务；登录成功后自动清空。" },
+        { "id": "sgcc_reset_login", "name": "重新验证登录", "val": false, "type": "boolean", "desc": "仅需要本人重新验证或短信超时时开启一次，再运行任务；保留设备及当日签到状态。" }
+      ],
+      "script": "https://raw.githubusercontent.com/lh0410/shadowrocket-config/main/scripts/sgcc-signin.js"
+    }
+  ]
+}

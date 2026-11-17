@@ -1,5 +1,5 @@
 #!name=walter个人配置
-#!desc=个人直连规则；北外滩签7天停1天；九号、百联、万象、龙湖每日11:00–12:00随机签到及参数过期提醒。
+#!desc=个人直连规则；北外滩签7天停1天；九号、百联、万象、龙湖、网上国网每日11:00–12:00随机签到。
 
 # 启用前请停用原来的同名模块、独立签到任务和Token提取任务，避免重复运行。
 # 需开启HTTPS解密，并安装、信任Shadowrocket当前使用的证书。
@@ -8,6 +8,7 @@
 [Rule]
 DOMAIN-SUFFIX,03061026.xyz,DIRECT
 DOMAIN,emby.barrybarry.top,DIRECT
+DOMAIN,csc-service.sgcc.com.cn,DIRECT
 
 [Script]
 国客Token提取 = type=http-request,pattern=^https://m\.mallcoo\.cn/api/,script-path=https://raw.githubusercontent.com/lh0410/shadowrocket-config/main/scripts/beiwaitan-token.js,requires-body=true,binary-body-mode=false,max-size=131072,engine=jsc,timeout=10,enable=true
@@ -18,6 +19,7 @@ DOMAIN,emby.barrybarry.top,DIRECT
 万象参数提取 = type=http-request,pattern=^https://app\.mixcapp\.com/mixc/(gateway|api/v4/member/getPersonalData)(\?|$),script-path=https://raw.githubusercontent.com/lh0410/shadowrocket-config/main/scripts/mall-token.js?v=20261117-malls,requires-body=true,binary-body-mode=false,max-size=131072,engine=jsc,timeout=10,enable=true
 龙湖参数提取 = type=http-request,pattern=^https://gw2c-hw-open\.longfor\.com/lmarketing-task-api-mvc-prod/openapi/task/v1/signature/(page-info|clock)(\?|$),script-path=https://raw.githubusercontent.com/lh0410/shadowrocket-config/main/scripts/mall-token.js?v=20261117-malls,requires-body=true,binary-body-mode=false,max-size=131072,engine=jsc,timeout=10,enable=true
 百联万象龙湖签到 = type=cron,cronexp="* 11 * * *",script-path=https://raw.githubusercontent.com/lh0410/shadowrocket-config/main/scripts/mall-signin.js?v=20261117-malls,engine=jsc,timeout=60,enable=true
+网上国网每日签到 = type=cron,cronexp="* 11 * * *",script-path=https://raw.githubusercontent.com/lh0410/shadowrocket-config/main/scripts/sgcc-signin.js?v=20261117-sgcc,engine=jsc,timeout=60,enable=true
 
 [MITM]
 hostname = %APPEND% m.mallcoo.cn, cn-cbu-gateway.ninebot.com, mh5.bl.com, app.mixcapp.com, gw2c-hw-open.longfor.com
