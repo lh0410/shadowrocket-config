@@ -282,7 +282,10 @@ test('midnight rollover during precheck never submits for the wrong date', () =>
 test('the module enables only the two services and shares each script between its two triggers', () => {
   const module = fs.readFileSync(path.join(__dirname, '../modules/beiwaitan.sgmodule'), 'utf8');
   assert(module.includes('hostname = %APPEND% m.mallcoo.cn, cn-cbu-gateway.ninebot.com\n'));
-  assert(!module.includes('[Rule]'));
+  assert.deepEqual(module.match(/^(?:DOMAIN-SUFFIX|DOMAIN),.*$/gm), [
+    'DOMAIN-SUFFIX,03061026.xyz,DIRECT',
+    'DOMAIN,emby.barrybarry.top,DIRECT'
+  ]);
   const scriptEntries = module.split('\n').filter(line => line.includes('script-path='));
   assert.equal(scriptEntries.length, 4);
   const [guestCapture, guestCron, nineCapture, nineCron] = scriptEntries;
