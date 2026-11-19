@@ -8,7 +8,7 @@
 https://raw.githubusercontent.com/lh0410/shadowrocket-config/main/modules/beiwaitan.sgmodule
 ```
 
-模块通过远程 URL 加载两个脚本，不需要在手机上复制或重命名 JS 文件。这是模块，需要配合现有主配置使用。
+「国客Token提取」和「国客每日签到」共用一个远程脚本，分别由小程序请求和定时任务触发。
 
 启用前，停用旧的签到模块、独立签到 Cron、Token 提取任务以及临时每分钟测试模块，避免重复运行。
 
@@ -50,8 +50,8 @@ Token 提取脚本只读取匹配请求，不主动发起签到，也不修改�
 
 ## 更新和隐私
 
-仓库更新后，在 Shadowrocket 刷新模块，并更新或重新下载远程脚本缓存。签7天停1天版的国客签到脚本 URL 带有 `?v=20261117-cycle`，保留完整奖励通知；若仍使用旧代码，核对脚本实际加载的 URL 和内容。
+仓库更新后，在 Shadowrocket 刷新模块，并更新或重新下载远程脚本缓存。确认两条国客任务指向同一个脚本 URL。
 
 Token 使用原有本地键 `beiwaitan_token`；签到状态使用 `beiwaitan_signin_state_v1`。切换本地/远程脚本无需迁移 Token。
 
-仓库仅保存通用模块、脚本及说明，不保存 Token、Cookie、抓包记录或证书。Token 提取成功通知会显示 Token，请勿公开包含 Token 的通知截图。
+仓库仅保存通用模块、脚本及说明，不保存 Token、Cookie、抓包记录或证书。提取成功的通知仅显示保存状态。

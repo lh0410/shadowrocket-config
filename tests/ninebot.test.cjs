@@ -3,7 +3,6 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const { test } = require('node:test');
-const capture = fs.readFileSync(path.join(__dirname, '../scripts/ninebot-token.js'), 'utf8');
 const signin = fs.readFileSync(path.join(__dirname, '../scripts/ninebot-signin.js'), 'utf8');
 const ACCOUNT = 'ninebot_account_v1', STATE = 'ninebot_signin_state_v1', LOCK = 'ninebot_signin_lock_v1';
 const auth = 'Bearer fake-ninebot-authorization', deviceId = 'fake-device-id';
@@ -51,7 +50,8 @@ function run(options = {}) {
     $httpClient: { get: (...args) => http('get', ...args), post: (...args) => http('post', ...args) }
   };
   if (options.request) context.$request = options.request;
-  vm.runInNewContext(options.capture ? capture : signin, context);
+  if (options.capture) context.$argument = 'capture';
+  vm.runInNewContext(signin, context);
   function verify() {
     assert.equal(done, 1);
     const visible = JSON.stringify({ notices, logs });
@@ -68,7 +68,7 @@ function req(headers = { Authorization: auth, device_id: deviceId }, body) {
 test('captures mixed case headers locally and passes through the request', () => {
   const request = req({ aUtHoRiZaTiOn: auth, DEVICE_ID: deviceId });
   const before = JSON.stringify(request);
-  const result = run({ capture: true, request, store: {} });
+  const result = run({ request, store: {} });
   assert.equal(JSON.parse(result.store[ACCOUNT]).authorization, auth);
   assert.equal(JSON.parse(result.store[ACCOUNT]).deviceId, deviceId);
   assert.equal(result.notices[0][1], '签到参数已保存');
@@ -107,10 +107,11 @@ test('ignores unrelated hosts and malformed bodies; header capture remains usabl
   assert(!run({ capture: true, request: req({ Authorization: auth }, '{broken'), store: {} }).store[ACCOUNT]);
 });
 
-test('manual capture test does not claim credentials were captured', () => {
-  const result = run({ capture: true, store: {} });
+test('manual capture without a request never falls through to sign-in', () => {
+  const result = run({ capture: true });
   assert.equal(result.notices[0][1], '脚本已加载');
-  assert(!result.store[ACCOUNT]);
+  assert.equal(result.calls.length, 0);
+  assert(!result.store[STATE]);
 });
 
 test('capture storage failure never reports saved credentials', () => {
@@ -278,13 +279,24 @@ test('midnight rollover during precheck never submits for the wrong date', () =>
   assert.equal(result.calls.length, 1);
 });
 
-test('module keeps existing rules and BWT schedule while enabling both Ninebot scripts', () => {
+test('the module enables only the two services and shares each script between its two triggers', () => {
   const module = fs.readFileSync(path.join(__dirname, '../modules/beiwaitan.sgmodule'), 'utf8');
-  assert(module.includes('DOMAIN-SUFFIX,03061026.xyz,DIRECT'));
-  assert(module.includes('DOMAIN,emby.barrybarry.top,DIRECT'));
-  assert(module.includes('cronexp="*/5 11 * * *"'));
-  assert(module.includes('cronexp="* 11 * * *"'));
-  const pattern = module.split('\n').find(line => line.startsWith('九号参数提取')).match(/pattern=(.*?),script-path=/)[1];
+  assert(module.includes('hostname = %APPEND% m.mallcoo.cn, cn-cbu-gateway.ninebot.com\n'));
+  assert(!module.includes('[Rule]'));
+  const scriptEntries = module.split('\n').filter(line => line.includes('script-path='));
+  assert.equal(scriptEntries.length, 4);
+  const [guestCapture, guestCron, nineCapture, nineCron] = scriptEntries;
+  for (const [capture, cron, file, schedule] of [
+    [guestCapture, guestCron, 'beiwaitan-signin.js', '*/5 11 * * *'],
+    [nineCapture, nineCron, 'ninebot-signin.js', '* 11 * * *']
+  ]) {
+    assert(capture.includes('type=http-request,') && capture.includes(',argument=capture,'));
+    assert(cron.includes('type=cron,cronexp="' + schedule + '"'));
+    const source = capture.match(/script-path=([^,]+)/)[1];
+    assert.equal(source, cron.match(/script-path=([^,]+)/)[1]);
+    assert.equal(new URL(source).pathname.split('/').pop(), file);
+  }
+  const pattern = nineCapture.match(/pattern=(.*?),script-path=/)[1];
   assert(new RegExp(pattern).test(req().url));
   assert(new RegExp(pattern).test(req().url.replace('status?t=1', 'sign')));
   assert(!new RegExp(pattern).test(req().url.replace('/status', '/status-other')));

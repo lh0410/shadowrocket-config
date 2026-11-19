@@ -1,13 +1,72 @@
-// 九号出行 Shadowrocket cron；API 参考 https://github.com/waistu/Ninebot 。
+// 九号出行 Shadowrocket 参数提取和定时签到；API 参考 https://github.com/waistu/Ninebot 。
 // 每天北京时间 11:00–11:59 随机选择一分钟，窗口外只查询、不补签。
 (function () {
   var ACCOUNT = "ninebot_account_v1";
   var STATE = "ninebot_signin_state_v1";
   var LOCK = "ninebot_signin_lock_v1";
   var BASE = "https://cn-cbu-gateway.ninebot.com/portal/api/user-sign/v2/";
+  var incomingRequest = typeof $request === "undefined" ? null : $request;
+  if (incomingRequest || (typeof $argument !== "undefined" && $argument === "capture")) {
+    captureRequest(incomingRequest);
+    return;
+  }
+
   var state = {}, loaded = false, finished = false, ownsLock = false;
   var owner = String(Date.now()) + "-" + Math.random();
   var account, today;
+
+  function logCapture(message) { console.log("[九号参数] " + message); }
+  function notifyCapture(title, message) {
+    logCapture(title + "：" + message);
+    if (typeof $notification !== "undefined") { $notification.post("九号出行", title, message); }
+  }
+  function header(headers, name) {
+    var keys = Object.keys(headers || {});
+    for (var i = 0; i < keys.length; i++) {
+      if (keys[i].toLowerCase() === name) { return String(headers[keys[i]] || "").trim(); }
+    }
+    return "";
+  }
+  function captureRequest(request) {
+    try {
+      if (!request || !request.url) {
+        notifyCapture("脚本已加载", "尚未获取参数，请打开九号 App 的签到页面触发真实请求。");
+        return;
+      }
+      if (!/^https:\/\/cn-cbu-gateway\.ninebot\.com\/portal\/api\/user-sign\/v2\/(status|sign)(?:\?|$)/i.test(request.url)) { return; }
+      var authorization = header(request.headers, "authorization");
+      var deviceId = header(request.headers, "device_id");
+      var bodyId = "";
+      if (typeof request.body === "string" && request.body.trim()) {
+        try {
+          var body = JSON.parse(request.body);
+          if (body && (typeof body.deviceId === "string" || typeof body.deviceId === "number")) {
+            bodyId = String(body.deviceId).trim();
+          }
+        } catch (parseError) { logCapture("正文不是 JSON，尝试使用请求头中的设备 ID。"); }
+      }
+      if (deviceId && bodyId && deviceId !== bodyId) {
+        notifyCapture("参数不一致", "请求头和正文中的设备 ID 不一致，本次未保存，请重新进入签到页面。");
+        return;
+      }
+      deviceId = deviceId || bodyId;
+      if (!authorization || !deviceId || /^Bearer\s*$/i.test(authorization)) {
+        logCapture("当前请求缺少完整的 Authorization 或 device_id，请登录并重新打开签到页。");
+        return;
+      }
+      var previous = JSON.parse($persistentStore.read(ACCOUNT) || "null");
+      if (previous && previous.authorization === authorization && previous.deviceId === deviceId) {
+        logCapture("参数未变化，保留已有凭据。"); return;
+      }
+      var account = { authorization: authorization, deviceId: deviceId, revision: String(Date.now()) + "-" + Math.random() };
+      if (!$persistentStore.write(JSON.stringify(account), ACCOUNT)) {
+        notifyCapture("参数保存失败", "请检查 Shadowrocket 本地存储，然后重新打开签到页面。"); return;
+      }
+      notifyCapture("签到参数已保存", "已获取 Authorization 和设备 ID，每天 11:00–12:00 内随机签到；参数仅保存在本机。");
+    } catch (error) {
+      notifyCapture("参数提取失败", "请检查脚本、本地存储及 HTTPS 解密配置，然后重新打开九号签到页面。");
+    } finally { $done({}); }
+  }
 
   function log(message) { console.log("[九号签到] " + message); }
   function clock() {

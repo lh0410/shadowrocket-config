@@ -34,7 +34,11 @@ function run(options = {}) {
       }
     },
     $notification: { post: (...args) => notices.push(args) },
-    $done: () => { done++; },
+    $done: value => {
+      done++;
+      assert.equal(value === undefined ? undefined : Object.keys(value).length,
+        options.request || options.capture ? 0 : undefined);
+    },
     $httpClient: { post: (request, callback) => {
       const path = new URL(request.url).pathname;
       calls.push({ path, body: JSON.parse(request.body) });
@@ -51,6 +55,8 @@ function run(options = {}) {
       if (options.defer) queueMicrotask(reply); else reply();
     } }
   };
+  if (options.request) context.$request = options.request;
+  if (options.capture) context.$argument = 'capture';
   vm.runInNewContext(source, context);
   function verify() {
     assert.equal(done, 1);
@@ -60,6 +66,41 @@ function run(options = {}) {
   }
   return options.defer ? new Promise(resolve => setImmediate(() => resolve(verify()))) : verify();
 }
+
+test('captures the guest token without modifying the request or running sign-in', () => {
+  const request = {
+    url: 'https://m.mallcoo.cn/api/user/user/CheckinBefore',
+    method: 'POST',
+    body: JSON.stringify({ MallID: 11949, Header: { Token: 'fake-phone-token' } })
+  };
+  const before = JSON.stringify(request);
+  const captured = run({ store: {}, request });
+  assert.equal(JSON.stringify(request), before);
+  assert.equal(captured.calls.length, 0);
+  assert.equal(captured.store.beiwaitan_token, 'fake-phone-token');
+  assert.equal(captured.notices[0][1], 'Token 已提取并保存');
+  assert.equal(run({ request, store: captured.store }).notices.length, 0);
+  assert.equal(run({ store: captured.store }).calls[0].path, CHECK);
+});
+
+test('guest capture with missing context, a different mall or a failed save never runs sign-in', () => {
+  const noRequest = run({ capture: true });
+  assert.equal(noRequest.notices[0][1], '脚本已加载');
+  assert.equal(noRequest.calls.length, 0);
+  const request = {
+    url: 'https://m.mallcoo.cn/api/user/user/CheckinBefore',
+    method: 'POST',
+    body: JSON.stringify({ MallId: 12000, Header: { Token: 'fake-phone-token' } })
+  };
+  const differentMall = run({ request, store: {} });
+  assert.equal(differentMall.calls.length, 0);
+  assert.equal(differentMall.store.beiwaitan_token, undefined);
+  request.body = JSON.stringify({ MallId: 11949, Header: { Token: 'fake-phone-token' } });
+  const failed = run({ request, store: {}, failWrite: key => key === 'beiwaitan_token' });
+  assert.equal(failed.calls.length, 0);
+  assert.equal(failed.notices[0][1], 'Token 保存失败');
+  assert.equal(failed.store.beiwaitan_token, undefined);
+});
 
 test('random plan waits and stays fixed for the day', () => {
   const first = run({ random: 0.99 });

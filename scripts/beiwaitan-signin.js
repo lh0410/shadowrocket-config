@@ -1,10 +1,11 @@
-// 北外滩国客中心每日签到（Shadowrocket cron）。
+// 北外滩国客中心凭据提取和每日签到（Shadowrocket）。
 // Cron：*/5 11 * * *；引擎 jsc；脚本超时 60 秒。
-// 使用提取脚本保存的 beiwaitan_token；时间按北京时间判断。
+// 使用请求触发时保存的 beiwaitan_token；时间按北京时间判断。
 // 11:00–11:55 随机选择一个 5 分钟时点；窗口外运行只查询，不补签。
 // 连续签到满 7 天后停签一天；结合服务端连续天数和本机停签日期恢复周期。
 (function () {
   var START_HOUR = 11;
+  var TOKEN_KEY = "beiwaitan_token";
   var STATE_KEY = "beiwaitan_signin_state_v1";
   var LOCK_KEY = "beiwaitan_signin_lock_v1";
   var BASE = "https://m.mallcoo.cn";
@@ -12,12 +13,55 @@
   var DETAIL = "/api/user/User/GetCheckinDetail";
   var RULE = "/api/user/Checkin/GetCheckinRuleBasicInfo";
   var SIGN = "/api/user/User/CheckinV2";
+  var incomingRequest = typeof $request === "undefined" ? null : $request;
+  if (incomingRequest || (typeof $argument !== "undefined" && $argument === "capture")) {
+    captureRequest(incomingRequest);
+    return;
+  }
+
   var state = {};
   var stateLoaded = false;
   var finished = false;
   var ownsLock = false;
   var owner = String(Date.now()) + "-" + Math.random();
   var token;
+
+  function reportCapture(title, message) {
+    console.log("[北外滩 Token] " + title + "：" + message);
+    if (typeof $notification !== "undefined" && typeof $notification.post === "function") {
+      $notification.post("北外滩国客中心", title, message);
+    }
+  }
+
+  function captureRequest(request) {
+    try {
+      if (!request || !request.url) {
+        reportCapture("脚本已加载", "请打开小程序的签到页面触发真实请求。");
+        return;
+      }
+      if (!/^https:\/\/m\.mallcoo\.cn\/api\//i.test(request.url)) { return; }
+      if (typeof request.body !== "string" || !request.body.trim()) {
+        if (String(request.method).toUpperCase() !== "GET") {
+          reportCapture("未读到请求正文", "请检查模块是否已启用正文读取。");
+        }
+        return;
+      }
+      var body = JSON.parse(request.body);
+      if (!body || Number(body.MallId == null ? body.MallID : body.MallId) !== 11949) { return; }
+      var token = body.Header && body.Header.Token;
+      if (typeof token !== "string" || !token.trim()) { return; }
+      if (token === $persistentStore.read(TOKEN_KEY)) { return; }
+      if (!$persistentStore.write(token, TOKEN_KEY)) {
+        reportCapture("Token 保存失败", "请检查小火箭本地存储，然后重新打开签到页面。");
+        return;
+      }
+      reportCapture("Token 已提取并保存", "签到凭据已保存在当前手机。");
+    } catch (error) {
+      console.log("[北外滩 Token] 提取失败，请检查请求正文和本地存储。");
+    } finally {
+      $done({});
+    }
+  }
 
   function log(message) {
     console.log("[北外滩签到] " + message);
@@ -199,7 +243,7 @@
     ownsLock = true;
     lock = JSON.parse($persistentStore.read(LOCK_KEY) || "null");
     if (!lock || lock.owner !== owner) { finish(); return; }
-    token = $persistentStore.read("beiwaitan_token");
+    token = $persistentStore.read(TOKEN_KEY);
     if (typeof token !== "string" || !token.trim()) {
       notify("missing-token", "尚未获取 Token", "请先打开小程序，让现有提取脚本保存 Token。");
       finish(); return;
