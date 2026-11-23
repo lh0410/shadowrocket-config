@@ -1,33 +1,15 @@
 #!name=walter个人配置
-#!desc=个人直连与值得买去广告；北外滩签7天停1天；九号每日11:00–12:00随机签到。
+#!desc=个人直连规则；北外滩签7天停1天；九号每日11:00–12:00随机签到。
 
 # 启用前请停用原来的同名模块、独立签到任务和Token提取任务，避免重复运行。
 # 需开启HTTPS解密，并安装、信任Shadowrocket当前使用的证书。
 # Token和签到状态只保存在手机本地，不包含在仓库中。
 
-# 什么值得买去广告规则改编自奶思（fmz200），感谢怎么肥事提供的脚本。
-# 来源：https://github.com/fmz200/wool_scripts/blob/main/Shadowrocket/module/split/partS/SMZDM.srmodule
-# 2026-11-23 合并上游配置，调整脚本入口名称并移除京东 CDN 规则。
-# 上游规则采用 GPL-3.0，许可文本见 licenses/fmz200-wool_scripts-GPL-3.0.txt。
-
 [Rule]
 DOMAIN-SUFFIX,03061026.xyz,DIRECT
 DOMAIN,emby.barrybarry.top,DIRECT
-
-# 什么值得买
-DOMAIN,aaid.uyunad.com,REJECT
-DOMAIN,acs4baichuan.m.taobao.com,REJECT
-DOMAIN,adashxgc.ut.taobao.com,REJECT
-DOMAIN,analytics-api.smzdm.com,REJECT
-DOMAIN,baichuan-sdk.alicdn.com,REJECT
-DOMAIN,msg.umengcloud.com,REJECT
-DOMAIN,sec.umeng.com,REJECT
-DOMAIN,ulogs.umeng.com,REJECT
-DOMAIN,ynuf.aliapp.org,REJECT
-DOMAIN-SUFFIX,res-ga.smzdm.com,REJECT
-
-[Map Local]
-^https?:\/\/haojia\.m\.smzdm\.com\/detail_modul\/other_modul\? data-type=text data="{}" header="Content-Type:application/json"
+# 与奶思版同时启用时，将本模块排在奶思版上方。
+DOMAIN,dgstatic.jd.com,DIRECT
 
 [Script]
 国客Token提取 = type=http-request,pattern=^https://m\.mallcoo\.cn/api/,script-path=https://raw.githubusercontent.com/lh0410/shadowrocket-config/main/scripts/beiwaitan-signin.js?v=20261119-combined,argument=capture,requires-body=true,binary-body-mode=false,max-size=131072,engine=jsc,timeout=10,enable=true
@@ -35,20 +17,5 @@ DOMAIN-SUFFIX,res-ga.smzdm.com,REJECT
 九号参数提取 = type=http-request,pattern=^https://cn-cbu-gateway\.ninebot\.com/portal/api/user-sign/v2/(status|sign)(\?|$),script-path=https://raw.githubusercontent.com/lh0410/shadowrocket-config/main/scripts/ninebot-signin.js?v=20261119-combined,argument=capture,requires-body=true,binary-body-mode=false,max-size=131072,engine=jsc,timeout=10,enable=true
 九号每日签到 = type=cron,cronexp="* 11 * * *",script-path=https://raw.githubusercontent.com/lh0410/shadowrocket-config/main/scripts/ninebot-signin.js?v=20261119-combined,engine=jsc,timeout=60,enable=true
 
-# 什么值得买
-值得买好价详情 = type=http-response, pattern=^https?:\/\/haojia\.m\.smzdm\.com\/detail_modul\/user_related_modul\?, script-path=https://raw.githubusercontent.com/fmz200/wool_scripts/main/Scripts/smzdm/smzdm_ads.js, requires-body=true, timeout=60
-值得买好价榜单 = type=http-response, pattern=^https?:\/\/haojia-api\.smzdm\.com\/ranking_list\/articles\?, script-path=https://raw.githubusercontent.com/fmz200/wool_scripts/main/Scripts/smzdm/smzdm_ads.js, requires-body=true, timeout=60
-值得买搜索热榜 = type=http-response, pattern=^https?:\/\/s-api\.smzdm\.com\/sou\/filter\/tags\/hot_tags\?, script-path=https://raw.githubusercontent.com/fmz200/wool_scripts/main/Scripts/smzdm/smzdm_ads.js, requires-body=true, timeout=60
-值得买搜索结果 = type=http-response, pattern=^https?:\/\/s-api\.smzdm\.com\/sou\/list_v10\?, script-path=https://raw.githubusercontent.com/fmz200/wool_scripts/main/Scripts/smzdm/smzdm_ads.js, requires-body=true, timeout=60
-值得买创作中心 = type=http-response, pattern=^https?:\/\/user-api\.smzdm\.com\/vip\/creator_user_center, script-path=https://raw.githubusercontent.com/fmz200/wool_scripts/main/Scripts/smzdm/smzdm_ads.js, requires-body=true, timeout=60
-值得买会员页面 = type=http-response, pattern=^https?:\/\/user-api\.smzdm\.com\/vip$, script-path=https://raw.githubusercontent.com/fmz200/wool_scripts/main/Scripts/smzdm/Smzdm.js, requires-body=true, timeout=60
-值得买开屏 = type=http-response, pattern=^https?:\/\/app-api\.smzdm\.com\/util\/loading, script-path=https://raw.githubusercontent.com/fmz200/wool_scripts/main/Scripts/smzdm/Smzdm.js, requires-body=true, timeout=60
-值得买弹窗 = type=http-response, pattern=^https?:\/\/app-api\.smzdm\.com\/util\/update, script-path=https://raw.githubusercontent.com/fmz200/wool_scripts/main/Scripts/smzdm/Smzdm.js, requires-body=true, timeout=60
-值得买个人页卡片 = type=http-response, pattern=^https?:\/\/user-api\.smzdm\.com\/vip\/bottom_card_list, script-path=https://raw.githubusercontent.com/fmz200/wool_scripts/main/Scripts/smzdm/Smzdm.js, requires-body=true, timeout=60
-值得买好价列表 = type=http-response, pattern=^https?:\/\/haojia-api\.smzdm\.com\/home\/list, script-path=https://raw.githubusercontent.com/fmz200/wool_scripts/main/Scripts/smzdm/Smzdm.js, requires-body=true, timeout=60
-值得买首页推荐 = type=http-response, pattern=^https?:\/\/homepage-api\.smzdm\.com\/v3\/home, script-path=https://raw.githubusercontent.com/fmz200/wool_scripts/main/Scripts/smzdm/Smzdm.js, requires-body=true, timeout=60
-值得买发布气泡 = type=http-response, pattern=^https?:\/\/article-api\.smzdm\.com\/publish\/get_bubble, script-path=https://raw.githubusercontent.com/fmz200/wool_scripts/main/Scripts/smzdm/Smzdm.js, requires-body=true, timeout=60
-值得买钱包入口 = type=http-response, pattern=^https?:\/\/qianbao\.smzdm\.com\/v\d\/app\/home, script-path=https://raw.githubusercontent.com/fmz200/wool_scripts/main/Scripts/smzdm/Smzdm.js, requires-body=true, timeout=60
-
 [MITM]
-hostname = %APPEND% m.mallcoo.cn, cn-cbu-gateway.ninebot.com, homepage-api.smzdm.com, haojia-api.smzdm.com, app-api.smzdm.com, user-api.smzdm.com, article-api.smzdm.com, qianbao.smzdm.com, s-api.smzdm.com, haojia.m.smzdm.com
+hostname = %APPEND% m.mallcoo.cn, cn-cbu-gateway.ninebot.com
