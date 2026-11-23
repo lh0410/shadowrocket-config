@@ -1,8 +1,9 @@
 #!name=walter去广告
-#!desc=拦截穿山甲广告 SDK 域名，用于屏蔽什么值得买好价信息流广告。
+#!desc=拦截穿山甲和欢效广告 SDK 域名，用于屏蔽什么值得买好价信息流广告。
 
 [Rule]
 # 什么值得买 · 好价推荐
 DOMAIN-SUFFIX,pangolin-sdk-toutiao.com,REJECT
 DOMAIN-SUFFIX,pangolin-sdk-toutiao1.com,REJECT
 DOMAIN-SUFFIX,pangolin-sdk-toutiao-b.com,REJECT
+DOMAIN,sdk.adhuanxiao.com,REJECT
