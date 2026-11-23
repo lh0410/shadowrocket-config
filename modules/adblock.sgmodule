@@ -4,10 +4,13 @@
 # 响应脚本和本地映射需要开启 HTTPS 解密。
 # 什么值得买去广告规则改编自奶思（fmz200），感谢怎么肥事提供的脚本。
 # 来源：https://github.com/fmz200/wool_scripts/blob/main/Shadowrocket/module/split/partS/SMZDM.srmodule
-# 2026-11-23 合并上游配置，调整脚本入口名称并移除京东 CDN 规则。
+# 2026-11-23 合并上游配置，调整脚本入口名称并移除上游的京东 CDN 拦截规则。
 # 上游规则采用 GPL-3.0，许可文本见 licenses/fmz200-wool_scripts-GPL-3.0.txt。
 
 [Rule]
+# 京东 CDN 直连
+DOMAIN,dgstatic.jd.com,DIRECT
+
 # 什么值得买 · 好价推荐
 DOMAIN-SUFFIX,pangolin-sdk-toutiao.com,REJECT
 DOMAIN-SUFFIX,pangolin-sdk-toutiao1.com,REJECT
