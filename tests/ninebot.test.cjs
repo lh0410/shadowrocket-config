@@ -279,15 +279,29 @@ test('midnight rollover during precheck never submits for the wrong date', () =>
   assert.equal(result.calls.length, 1);
 });
 
-test('the module enables only the two services and shares each script between its two triggers', () => {
+test('the module preserves both sign-in services and configures the SMZDM ad filters', () => {
   const module = fs.readFileSync(path.join(__dirname, '../modules/beiwaitan.sgmodule'), 'utf8');
-  assert(module.includes('hostname = %APPEND% m.mallcoo.cn, cn-cbu-gateway.ninebot.com\n'));
-  assert.deepEqual(module.match(/^(?:DOMAIN-SUFFIX|DOMAIN),.*$/gm), [
-    'DOMAIN-SUFFIX,03061026.xyz,DIRECT',
-    'DOMAIN,emby.barrybarry.top,DIRECT',
-    'DOMAIN,dgstatic.jd.com,DIRECT'
+  const hostname = module.match(/^hostname = %APPEND% (.+)$/m)[1];
+  assert.deepEqual(hostname.split(', '), [
+    'm.mallcoo.cn', 'cn-cbu-gateway.ninebot.com', 'homepage-api.smzdm.com', 'haojia-api.smzdm.com',
+    'app-api.smzdm.com', 'user-api.smzdm.com', 'article-api.smzdm.com', 'qianbao.smzdm.com',
+    's-api.smzdm.com', 'haojia.m.smzdm.com'
   ]);
-  const scriptEntries = module.split('\n').filter(line => line.includes('script-path='));
+  const rules = module.match(/^(?:DOMAIN-SUFFIX|DOMAIN),.*$/gm);
+  assert.deepEqual(rules.filter(rule => rule.endsWith(',DIRECT')), [
+    'DOMAIN-SUFFIX,03061026.xyz,DIRECT',
+    'DOMAIN,emby.barrybarry.top,DIRECT'
+  ]);
+  assert.equal(rules.filter(rule => rule.endsWith(',REJECT')).length, 10);
+  assert(!module.includes('dgstatic.jd.com'));
+  assert(module.includes('[Map Local]\n'));
+  const entries = module.split('\n').filter(line => line.includes('script-path='));
+  const names = entries.map(line => line.split(' = ', 1)[0]);
+  assert.equal(new Set(names).size, entries.length);
+  const adScripts = entries.filter(line => line.includes('type=http-response,'));
+  assert.equal(adScripts.length, 13);
+  assert(adScripts.every(line => line.includes('/fmz200/wool_scripts/main/Scripts/smzdm/')));
+  const scriptEntries = entries.filter(line => !line.includes('type=http-response,'));
   assert.equal(scriptEntries.length, 4);
   const [guestCapture, guestCron, nineCapture, nineCron] = scriptEntries;
   for (const [capture, cron, file, schedule] of [
