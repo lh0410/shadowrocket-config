@@ -8,6 +8,8 @@
 [Rule]
 DOMAIN-SUFFIX,03061026.xyz,DIRECT
 DOMAIN,emby.barrybarry.top,DIRECT
+# 与奶思版同时启用时，将本模块排在奶思版上方。
+DOMAIN,dgstatic.jd.com,DIRECT
 
 [Script]
 国客Token提取 = type=http-request,pattern=^https://m\.mallcoo\.cn/api/,script-path=https://raw.githubusercontent.com/lh0410/shadowrocket-config/main/scripts/beiwaitan-signin.js?v=20261119-combined,argument=capture,requires-body=true,binary-body-mode=false,max-size=131072,engine=jsc,timeout=10,enable=true

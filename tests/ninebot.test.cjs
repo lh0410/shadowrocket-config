@@ -284,7 +284,8 @@ test('the module enables only the two services and shares each script between it
   assert(module.includes('hostname = %APPEND% m.mallcoo.cn, cn-cbu-gateway.ninebot.com\n'));
   assert.deepEqual(module.match(/^(?:DOMAIN-SUFFIX|DOMAIN),.*$/gm), [
     'DOMAIN-SUFFIX,03061026.xyz,DIRECT',
-    'DOMAIN,emby.barrybarry.top,DIRECT'
+    'DOMAIN,emby.barrybarry.top,DIRECT',
+    'DOMAIN,dgstatic.jd.com,DIRECT'
   ]);
   const scriptEntries = module.split('\n').filter(line => line.includes('script-path='));
   assert.equal(scriptEntries.length, 4);
