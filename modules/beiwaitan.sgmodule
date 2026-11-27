@@ -10,8 +10,8 @@ DOMAIN-SUFFIX,03061026.xyz,DIRECT
 DOMAIN,emby.barrybarry.top,DIRECT
 
 [Script]
-国客Token提取 = type=http-request,pattern=^https://m\.mallcoo\.cn/api/,script-path=https://raw.githubusercontent.com/lh0410/shadowrocket-config/main/scripts/beiwaitan-signin.js?v=20261119-combined,argument=capture,requires-body=true,binary-body-mode=false,max-size=131072,engine=jsc,timeout=10,enable=true
-国客每日签到 = type=cron,cronexp="*/5 11 * * *",script-path=https://raw.githubusercontent.com/lh0410/shadowrocket-config/main/scripts/beiwaitan-signin.js?v=20261119-combined,engine=jsc,timeout=60,enable=true
+国客Token提取 = type=http-request,pattern=^https://m\.mallcoo\.cn/api/,script-path=https://raw.githubusercontent.com/lh0410/shadowrocket-config/main/scripts/beiwaitan-signin.js?v=20261127-server-count,argument=capture,requires-body=true,binary-body-mode=false,max-size=131072,engine=jsc,timeout=10,enable=true
+国客每日签到 = type=cron,cronexp="*/5 11 * * *",script-path=https://raw.githubusercontent.com/lh0410/shadowrocket-config/main/scripts/beiwaitan-signin.js?v=20261127-server-count,engine=jsc,timeout=60,enable=true
 九号参数提取 = type=http-request,pattern=^https://cn-cbu-gateway\.ninebot\.com/portal/api/user-sign/v2/(status|sign)(\?|$),script-path=https://raw.githubusercontent.com/lh0410/shadowrocket-config/main/scripts/ninebot-signin.js?v=20261119-combined,argument=capture,requires-body=true,binary-body-mode=false,max-size=131072,engine=jsc,timeout=10,enable=true
 九号每日签到 = type=cron,cronexp="* 11 * * *",script-path=https://raw.githubusercontent.com/lh0410/shadowrocket-config/main/scripts/ninebot-signin.js?v=20261119-combined,engine=jsc,timeout=60,enable=true
 

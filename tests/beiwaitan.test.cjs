@@ -257,20 +257,21 @@ test('seventh successful day schedules exactly one rest day and then resumes at 
   assert.equal(run({ store: seventh.store, time: '2026-11-12T03:55:00Z' }).calls.length, 0);
   assert.equal(run({ store: seventh.store, time: '2026-11-12T06:00:00Z' }).calls.length, 0);
   assert.equal(run({ store: seventh.store, time: '2026-11-12T03:55:00Z' }).notices.length, 0);
-  const resumed = run({ store: seventh.store, time: '2026-11-13T03:30:00Z', continueDay: 7 });
+  const resumed = run({ store: seventh.store, time: '2026-11-13T03:30:00Z', continueDay: 0 });
   assert(resumed.calls.some(r => r.path === SIGN));
   assert.equal(JSON.parse(resumed.store[STATE]).cycleCount, 1);
   assert(!JSON.parse(resumed.store[STATE]).restDay);
 });
 
-test('initial server streak at or beyond seven rests today and never gets stuck on a stale count', () => {
+test('a server streak of at least seven pauses submissions until the API resets', () => {
   for (const continueDay of [7, 10, '7']) {
     const first = run({ continueDay });
     assert.deepEqual(first.calls.map(r => r.path), [CHECK, DETAIL]);
     assert.equal(JSON.parse(first.store[STATE]).restDay, '2026-11-11');
     const next = run({ store: first.store, time: '2026-11-12T03:30:00Z', continueDay });
-    assert(next.calls.some(r => r.path === SIGN));
-    assert.equal(JSON.parse(next.store[STATE]).cycleCount, 1);
+    assert.deepEqual(next.calls.map(r => r.path), [CHECK, DETAIL]);
+    const reset = run({ store: next.store, time: '2026-11-13T03:30:00Z', continueDay: 0 });
+    assert.equal(JSON.parse(reset.store[STATE]).cycleCount, 1);
   }
 });
 
@@ -299,13 +300,13 @@ test('rest survives token refresh and still applies when the cron is first opene
   assert.equal(rest.notices[0][1], '今日停签一天');
 });
 
-test('missed scheduled rest day and a naturally missed day both allow a new cycle', () => {
+test('a gap in local history does not reset the server streak', () => {
   const seventh = run({ continueDay: 6 });
-  const resumed = run({ store: seventh.store, time: '2026-11-13T03:30:00Z', continueDay: 7 });
+  const resumed = run({ store: seventh.store, time: '2026-11-13T03:30:00Z', continueDay: 0 });
   assert.equal(JSON.parse(resumed.store[STATE]).cycleCount, 1);
   const fifth = run({ continueDay: 4 });
   const missed = run({ store: fifth.store, time: '2026-11-13T03:30:00Z', continueDay: 5 });
-  assert.equal(JSON.parse(missed.store[STATE]).cycleCount, 1);
+  assert.equal(JSON.parse(missed.store[STATE]).cycleCount, 6);
 });
 
 test('pending and failed submissions do not advance the confirmed count or plan a rest day', () => {
@@ -343,7 +344,7 @@ test('cycles work across a year boundary using Beijing calendar dates', () => {
   const first = run({ time: '2026-12-31T03:30:00Z', continueDay: 6 });
   assert.equal(JSON.parse(first.store[STATE]).restDay, '2027-01-01');
   assert.equal(run({ store: first.store, time: '2027-01-01T03:30:00Z' }).calls.length, 0);
-  const next = run({ store: first.store, time: '2027-01-02T03:30:00Z', continueDay: 7 });
+  const next = run({ store: first.store, time: '2027-01-02T03:30:00Z', continueDay: 0 });
   assert.equal(JSON.parse(next.store[STATE]).cycleCount, 1);
 });
 
@@ -351,7 +352,7 @@ test('repeats seven successful days then one off for multiple cycles', () => {
   const store = { beiwaitan_token: 'fake-phone-token' };
   for (let index = 0; index < 17; index++) {
     const time = new RealDate(RealDate.UTC(2026, 10, 1 + index, 3, 30)).toISOString();
-    const continueDay = JSON.parse(store[STATE] || '{}').cycleCount || 0;
+    const continueDay = index % 8;
     const result = run({ store, time, continueDay });
     const resting = index % 8 === 7;
     assert.equal(result.calls.filter(r => r.path === SIGN).length, resting ? 0 : 1);
@@ -367,13 +368,22 @@ test('asynchronous status, detail, rules and sign callbacks preserve the seventh
   assert.equal(run({ store: result.store, time: '2026-11-12T03:30:00Z' }).calls.length, 0);
 });
 
-test('server count that remains above seven does not shorten subsequent seven-day cycles', () => {
-  const store = { beiwaitan_token: 'fake-phone-token' };
-  for (let index = 0; index < 17; index++) {
-    const time = new RealDate(RealDate.UTC(2026, 10, 1 + index, 3, 30)).toISOString();
-    const result = run({ store, time, continueDay: 7 + index });
-    const resting = index % 8 === 0;
-    assert.equal(result.calls.filter(r => r.path === SIGN).length, resting ? 0 : 1);
-    if (!resting) assert.equal(JSON.parse(store[STATE]).cycleCount, index % 8);
+test('the server streak wins when yesterday was recorded locally', () => {
+  for (const [server, expected] of [[7, 'rest'], [2, 'signed_in']]) {
+    const prior = run({ continueDay: 5 });
+    const result = run({ store: prior.store, time: '2026-11-12T03:30:00Z', continueDay: server });
+    const state = JSON.parse(result.store[STATE]);
+    assert.equal(state.status, expected);
+    assert.equal(result.calls.some(r => r.path === SIGN), expected === 'signed_in');
+    if (expected === 'signed_in') assert.equal(state.cycleCount, server + 1);
   }
+});
+
+test('a same-day status check corrects the cached count from the API', () => {
+  const first = run({ continueDay: 1 });
+  const status = run({ store: first.store, time: '2026-11-11T06:00:00Z', continueDay: 7,
+    answer: path => path === CHECK ? { data: { m: 2054, d: { IsCheckIn: true } } } : null });
+  assert.deepEqual(status.calls.map(r => r.path), [CHECK, DETAIL]);
+  assert.equal(JSON.parse(status.store[STATE]).cycleCount, 7);
+  assert.equal(JSON.parse(status.store[STATE]).restDay, '2026-11-12');
 });
